@@ -1,16 +1,13 @@
 name: D5 Container Security Scan
 
 # AXA Secure SDLC Training - Demo 7, Activities 3 and 4 (Slide 65)
-# Builds the Docker image and scans it with Trivy for:
-#   - OS-level CVEs in the base image
-#   - Misconfigurations (running as root)
-# FAILS on the vulnerable Dockerfile, PASSES on the fixed one.
+# Builds the Docker image and scans it with Trivy for OS CVEs and Dockerfile
+# misconfigurations. FAILS on the vulnerable Dockerfile, PASSES on the fixed one.
 #
-# NOTE ON TRIVY: the aquasecurity/trivy-action GitHub Action was compromised
-# twice in 2026 (Mar 1 and Mar 19). Rather than use the action, this workflow
-# installs the Trivy binary directly from Aqua's official APT repository and
-# pins a known-safe version. This is the more defensible choice for a security
-# training demo. Safe versions per the official advisory: trivy v0.69.3.
+# NOTE ON TRIVY: the aquasecurity/trivy-action and binary releases were
+# compromised in Feb-Mar 2026 (the v0.69.x line and the GitHub Actions). This
+# workflow installs the binary via the official install script and pins a
+# current post-incident version, clear of the compromised range.
 
 on:
   push:
@@ -22,15 +19,11 @@ permissions:
   contents: read
 
 env:
-  TRIVY_VERSION: '0.69.3'   # known-safe version per Aqua advisory
+  TRIVY_VERSION: '0.71.2'   # current stable, clear of the 0.69.x compromise
   IMAGE_TAG: 'axa-demo:ci'
 
 jobs:
 
-  # ==========================================================================
-  # CONTAINER SCAN: build the image, scan with Trivy (CVEs + misconfig)
-  # AXA: CLDEV-CFG-01
-  # ==========================================================================
   container-scan:
     name: Container Scan (Trivy)
     runs-on: ubuntu-latest
@@ -41,7 +34,7 @@ jobs:
       - name: Build the Docker image
         run: docker build -t ${{ env.IMAGE_TAG }} .
 
-      - name: Install Trivy (official install script, pinned version)
+      - name: Install Trivy (official install script, pinned current version)
         run: |
           curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
             | sudo sh -s -- -b /usr/local/bin v${{ env.TRIVY_VERSION }}
@@ -52,7 +45,7 @@ jobs:
           trivy image \
             --severity CRITICAL,HIGH \
             --exit-code 1 \
-            --no-progress \
+            --quiet \
             ${{ env.IMAGE_TAG }}
 
       - name: Scan Dockerfile for misconfigurations (fail on root user, etc.)
@@ -60,12 +53,9 @@ jobs:
           trivy config \
             --severity CRITICAL,HIGH \
             --exit-code 1 \
-            --no-progress \
+            --quiet \
             .
 
-  # ==========================================================================
-  # GATE: single required check. Require ONLY this in branch protection.
-  # ==========================================================================
   gate:
     name: Security Gate
     runs-on: ubuntu-latest
