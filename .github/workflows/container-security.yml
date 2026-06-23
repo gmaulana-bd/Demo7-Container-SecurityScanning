@@ -41,14 +41,10 @@ jobs:
       - name: Build the Docker image
         run: docker build -t ${{ env.IMAGE_TAG }} .
 
-      - name: Install Trivy (pinned safe version, from official APT repo)
+      - name: Install Trivy (official install script, pinned version)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y wget apt-transport-https gnupg
-          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo gpg --dearmor -o /usr/share/keyrings/trivy.gpg
-          echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" | sudo tee /etc/apt/sources.list.d/trivy.list
-          sudo apt-get update
-          sudo apt-get install -y trivy=${{ env.TRIVY_VERSION }}
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+            | sudo sh -s -- -b /usr/local/bin v${{ env.TRIVY_VERSION }}
           trivy --version
 
       - name: Scan image for CVEs (fail on CRITICAL or HIGH)
