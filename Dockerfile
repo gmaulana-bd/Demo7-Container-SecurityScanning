@@ -1,24 +1,27 @@
-# D5 Container Misconfiguration Demo (FIXED VERSION)
+# D5 Container Misconfiguration Demo (VULNERABLE - for vulnerable-feature branch)
 #
-# AXA Secure SDLC Training - Demo 7, Activity 4 (Slide 65)
-# Every problem from the vulnerable Dockerfile is corrected:
-#   - Current, minimal base image (Alpine, far smaller CVE surface than old Debian)
-#   - Explicit non-root USER
-#   - No unnecessary packages
+# AXA Secure SDLC Training - Demo 7, Activity 3 (Slide 65)
+# Deliberate problems that Trivy catches:
+#   - Old base image with known CVEs
+#   - Runs as root (no USER directive)
+#   - No read-only filesystem hardening
 #
-# The Trivy scan in CI/CD PASSES on this Dockerfile.
+# The Trivy scan in CI/CD will FAIL on this Dockerfile.
 
-# FIXED: current minimal Alpine base. Small attack surface, actively patched.
-FROM alpine:3.23
+# VULNERABLE: old Debian base with many known CVEs.
+# A pinned old tag guarantees Trivy finds OS-level vulnerabilities.
+FROM debian:11.0
 
-# FIXED: create a dedicated non-root user and group
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+# VULNERABLE: installs packages but never creates or switches to a non-root user.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy the app and make it executable
+# A trivial app file
 COPY app.sh /app/app.sh
-RUN chmod +x /app/app.sh && chown appuser:appgroup /app/app.sh
+RUN chmod +x /app/app.sh
 
-# FIXED: switch to the non-root user (Trivy DS002 satisfied)
-USER appuser
+# VULNERABLE: no USER directive. Container runs as root by default.
+# Trivy misconfiguration scan flags this (DS002: root user).
 
 ENTRYPOINT ["/app/app.sh"]
